@@ -49,9 +49,7 @@ func Check(p *plan.Plan, pl place.Placement, rt route.Result) Report {
 		msgs = append(msgs, fmt.Sprintf("placement has %d machines, plan has %d", len(pl.Machines), len(p.Machines)))
 		ok = false
 	}
-	// Factory-of-blocks may leave placement empty; machines live in route entities.
 
-	// Overlap check (single-block placement only)
 	occ := map[[2]int]int{}
 	for _, m := range pl.Machines {
 		mi := p.Machines[m.ID]
@@ -71,14 +69,12 @@ func Check(p *plan.Plan, pl place.Placement, rt route.Result) Report {
 		}
 	}
 
-	// Every machine should produce or consume something
 	for _, mi := range p.Machines {
 		if len(mi.Products) == 0 && len(mi.Ingredients) == 0 {
 			msgs = append(msgs, fmt.Sprintf("machine %d (%s) has empty I/O", mi.ID, mi.Recipe))
 		}
 	}
 
-	// Route stats
 	if !rt.Success {
 		msgs = append(msgs, "routing incomplete: "+rt.Message)
 	}
@@ -109,7 +105,6 @@ func Check(p *plan.Plan, pl place.Placement, rt route.Result) Report {
 		msgs = append(msgs, fmt.Sprintf("route has %d machines, expected %d", machines, len(p.Machines)))
 	}
 
-	// Coverage: share of nets with at least one belt
 	netsWithBelt := map[int]bool{}
 	for _, e := range rt.Entities {
 		if e.Kind == route.KindBelt || e.Kind == route.KindUndergroundIn {
@@ -131,6 +126,17 @@ func Check(p *plan.Plan, pl place.Placement, rt route.Result) Report {
 	if itemNets > 0 {
 		msgs = append(msgs, fmt.Sprintf("belt coverage %d/%d item nets; %d belts %d ug %d inserters %d poles",
 			covered, itemNets, belts, ugs, ins, poles))
+	}
+
+	// Soft inserter-rate note (warnings only; never fails the report).
+	if len(rt.Entities) > 0 && len(p.Machines) > 0 {
+		ir := CheckInserterRates(p, rt.Entities, 2, 1)
+		if len(ir.Warnings) > 0 {
+			msgs = append(msgs, "inserter-rate notes: "+ir.Warnings[0])
+			if len(ir.Warnings) > 1 {
+				msgs = append(msgs, fmt.Sprintf("  (+%d more inserter capacity notes)", len(ir.Warnings)-1))
+			}
+		}
 	}
 
 	if ok && len(msgs) == 0 {
