@@ -1,0 +1,6 @@
+solves/
+*.log
+.DS_Store
+data/recipes.json
+.env
+.token

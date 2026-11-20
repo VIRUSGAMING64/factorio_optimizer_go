@@ -1,0 +1,10 @@
+{
+  "quality": "normal",
+  "machine": "assembling-machine-3",
+  "belt_tier": "fast",
+  "forbidden_recipes": [],
+  "targets": [
+    { "name": "automation-science-pack", "amount": 0.5 },
+    { "name": "logistic-science-pack", "amount": 0.5 }
+  ]
+}
