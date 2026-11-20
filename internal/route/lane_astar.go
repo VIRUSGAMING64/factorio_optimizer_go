@@ -39,7 +39,15 @@ func (h *lanePQ) Pop() interface{} {
 
 // FindPathLaneAStar runs A* over (tile, direction, lane).
 // Lane switches and turns are penalised; same-lane straight runs are preferred.
+// Residual capacity is not considered; see FindPathLaneAStarCapacity.
 func (pf *PathFinder) FindPathLaneAStar(src, dst geom.Point, netID int, startLane Lane) ([]geom.Point, []Lane) {
+	return pf.FindPathLaneAStarCapacity(src, dst, netID, startLane, nil)
+}
+
+// FindPathLaneAStarCapacity is the capacity-aware variant of FindPathLaneAStar.
+// When lt is non-nil the step cost is increased for lanes that already have low
+// residual capacity, so the search prefers freer lanes of the same net.
+func (pf *PathFinder) FindPathLaneAStarCapacity(src, dst geom.Point, netID int, startLane Lane, lt *LaneTracker) ([]geom.Point, []Lane) {
 	src = pf.nearestFree(src, netID)
 	dst = pf.nearestFree(dst, netID)
 	if src.X < 0 || dst.X < 0 {
@@ -87,6 +95,7 @@ func (pf *PathFinder) FindPathLaneAStar(src, dst geom.Point, netID int, startLan
 			if !pf.Walkable(nx, ny, netID) {
 				continue
 			}
+			idx := pf.idx(nx, ny)
 			for _, lane := range []Lane{LaneLeft, LaneRight} {
 				nn := LaneNode{X: nx, Y: ny, Dir: d, Lane: lane}
 				nk := nn.key(pf.W)
@@ -102,6 +111,19 @@ func (pf *PathFinder) FindPathLaneAStar(src, dst geom.Point, netID int, startLan
 				}
 				if lane == cur.node.Lane && d == cur.node.Dir {
 					step *= 0.92
+				}
+				// Prefer lanes with residual capacity when a tracker is supplied.
+				if lt != nil {
+					rem := lt.RemainingLane(idx, lane)
+					cap := lt.CapPerLane()
+					if cap > 0 {
+						// Penalty grows as residual fraction drops (0..~1.5).
+						usedFrac := 1.0 - rem/cap
+						if usedFrac < 0 {
+							usedFrac = 0
+						}
+						step += usedFrac * 1.2
+					}
 				}
 				ng := cur.g + step
 				if old, ok := gscore[nk]; ok && ng >= old {
