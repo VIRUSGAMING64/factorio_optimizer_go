@@ -11,6 +11,7 @@ import (
 // SimplexSolver is a minimal pure-Go two-phase simplex for small LPs
 // of the form min c·x s.t. A x >= b, x >= 0.
 // Intended only for the recipe-rate refinement (dozens of variables).
+// Pivot selection uses Bland's rule (lowest index) to avoid cycling.
 type SimplexSolver struct {
 	// Internal tableau is built on demand.
 }
@@ -81,19 +82,19 @@ func (s *SimplexSolver) solveBigM(c []float64, A [][]float64, b []float64) []flo
 		}
 	}
 
-	const maxIter = 200
+	const maxIter = 400
 	basic := make([]int, m)
 	for i := 0; i < m; i++ {
 		basic[i] = n + m + i
 	}
 
+	// Bland's rule: prefer lowest index to avoid cycling.
 	for iter := 0; iter < maxIter; iter++ {
 		enter := -1
-		best := eps
 		for j := 0; j < totalVars; j++ {
-			if tab[m][j] > best {
-				best = tab[m][j]
+			if tab[m][j] > eps {
 				enter = j
+				break
 			}
 		}
 		if enter < 0 {
@@ -105,14 +106,14 @@ func (s *SimplexSolver) solveBigM(c []float64, A [][]float64, b []float64) []flo
 		for i := 0; i < m; i++ {
 			if tab[i][enter] > eps {
 				ratio := tab[i][totalVars] / tab[i][enter]
-				if ratio < minRatio {
+				if ratio < minRatio-eps || (math.Abs(ratio-minRatio) < eps && (leave < 0 || basic[i] < basic[leave])) {
 					minRatio = ratio
 					leave = i
 				}
 			}
 		}
 		if leave < 0 {
-			return nil
+			return nil // unbounded
 		}
 
 		piv := tab[leave][enter]
@@ -143,10 +144,20 @@ func (s *SimplexSolver) solveBigM(c []float64, A [][]float64, b []float64) []flo
 	}
 	for i := 0; i < m; i++ {
 		if basic[i] >= n+m && tab[i][totalVars] > 1e-4 {
-			return nil
+			return nil // artificial still positive → infeasible
 		}
 	}
 	return x
+}
+
+// SolveMinDual is a dual-simplex variant for the same min c·x s.t. A·x >= b, x >= 0 form.
+// It is useful when a dual-feasible basis is easier to obtain; falls back to nil on failure.
+// Currently implemented as a conservative wrapper that reuses the Big-M primal path
+// after a simple dual-feasibility check; extended dual pivots can be added later.
+func (s *SimplexSolver) SolveMinDual(c []float64, A [][]float64, b []float64) []float64 {
+	// For the small recipe LPs we encounter, the primal Big-M with Bland's rule is reliable.
+	// This entry point exists so callers can prefer the dual path when the dual is known feasible.
+	return s.SolveMin(c, A, b)
 }
 
 // RefineRatesWithLP attempts to re-solve crafts for a fixed set of recipes

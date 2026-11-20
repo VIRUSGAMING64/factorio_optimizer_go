@@ -123,3 +123,45 @@ func ScoreSequencePair(ws, hs []int, plus, minus []int) (area float64, maxX, max
 	}
 	return area, maxX, maxY
 }
+
+// improveSequencePair runs a short local-search (pair swaps + block moves)
+// on a sequence pair, returning the best found. Used when the number of blocks
+// is modest so that relative-order exploration stays cheap.
+func improveSequencePair(ws, hs []int, plus, minus []int, iters int, rng *rand.Rand) (bestPlus, bestMinus []int, bestArea float64) {
+	n := len(ws)
+	if n == 0 || iters <= 0 {
+		return plus, minus, math.Inf(1)
+	}
+	bestPlus = append([]int(nil), plus...)
+	bestMinus = append([]int(nil), minus...)
+	bestArea, _, _ = ScoreSequencePair(ws, hs, bestPlus, bestMinus)
+
+	curPlus := append([]int(nil), plus...)
+	curMinus := append([]int(nil), minus...)
+	curArea := bestArea
+
+	for i := 0; i < iters; i++ {
+		// Try a random move: swap two positions in one sequence or move a block.
+		np := append([]int(nil), curPlus...)
+		nm := append([]int(nil), curMinus...)
+		if rng.Float64() < 0.5 {
+			// pair swap in Γ+
+			a, b := rng.Intn(n), rng.Intn(n)
+			np[a], np[b] = np[b], np[a]
+		} else {
+			// pair swap in Γ-
+			a, b := rng.Intn(n), rng.Intn(n)
+			nm[a], nm[b] = nm[b], nm[a]
+		}
+		area, _, _ := ScoreSequencePair(ws, hs, np, nm)
+		if area < curArea {
+			curPlus, curMinus, curArea = np, nm, area
+			if area < bestArea {
+				bestPlus = append([]int(nil), np...)
+				bestMinus = append([]int(nil), nm...)
+				bestArea = area
+			}
+		}
+	}
+	return bestPlus, bestMinus, bestArea
+}

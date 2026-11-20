@@ -144,6 +144,10 @@ func Pack(blocks []FloorBlock, nets []FloorNet, aspect float64, attempts int) Fl
 			x, y, maxX, maxY = packSkyline(ws, hs, order, targetW)
 		} else if a%3 == 1 {
 			gp, gm := randomSequencePair(rng, len(blocks))
+			// Local search when the block count is modest
+			if len(blocks) <= 24 {
+				gp, gm, _ = improveSequencePair(ws, hs, gp, gm, 32, rng)
+			}
 			x, y, maxX, maxY = packSequencePair(ws, hs, gp, gm)
 		} else {
 			// original row-major fallback

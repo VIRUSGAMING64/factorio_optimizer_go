@@ -250,3 +250,38 @@ The core pipeline is stable and importable. With the pure-Go simplex refinement 
    when the number of blocks is small.
 3. Stronger fluid / heat pipe routing heuristics.
 4. Further lane polarity refinements (prefer matching inserter side).
+
+### 2026-11-20 (continued – Bland's rule + sequence-pair local search + multi-source pipes)
+- Simplex (`internal/plan/simplex.go`):
+  - Pivot selection now uses Bland's rule (lowest index entering and leaving)
+    to avoid cycling on degenerate LPs.
+  - Increased max iterations; added `SolveMinDual` entry point (currently
+    delegates to the robust primal path so callers can prefer the dual when
+    known feasible).
+  - New tests cover dual entry and a larger 3-variable LP; infeasible case
+    still rejected.
+- Sequence-pair floorplan (`internal/blocks/sequence.go`):
+  - Added modular `improveSequencePair` that performs a short local search
+    (pair swaps in Γ+ / Γ-).
+  - `Pack` now calls it when the block count is modest (≤ 24) so relative-order
+    exploration is refined without a full SA loop.
+  - Unit test verifies the improver never worsens area and preserves non-overlap.
+- Pipe routing (`internal/route/pipes.go`):
+  - Replaced single-source BFS with multi-source BFS that finds the shortest
+    path from any fluid source to any target.
+  - Endpoints are always acceptable; intermediates still respect walkability.
+- Full suite remains green after the changes (`go test ./...`).
+
+## Current baseline after this session
+- LP solver more robust against cycling.
+- Sequence-pair packing has a cheap local-search refinement.
+- Fluid routing considers all sources/targets for shorter pipes.
+- All previous features (capacity-aware A*, residual balancing, beacons,
+  validation, blueprints, viz) unchanged and stable.
+
+### Next high-value modular steps
+1. True dual-simplex pivots when a dual-feasible basis is available.
+2. Lane polarity: prefer the lane that matches the inserter's preferred side.
+3. Heat-pipe / nuclear routing heuristics.
+4. Optional external LP solver interface (e.g. via cgo or pure-Go revised simplex)
+   for larger recipe sets.

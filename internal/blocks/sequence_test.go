@@ -52,3 +52,24 @@ func TestPackUsesSequencePair(t *testing.T) {
 		t.Fatal("invalid cost")
 	}
 }
+
+func TestImproveSequencePair(t *testing.T) {
+	rng := rand.New(rand.NewSource(7))
+	ws := []int{4, 6, 3, 5, 4, 7}
+	hs := []int{5, 3, 4, 4, 6, 3}
+	plus, minus := randomSequencePair(rng, len(ws))
+	startArea, _, _ := ScoreSequencePair(ws, hs, plus, minus)
+	bp, bm, bestArea := improveSequencePair(ws, hs, plus, minus, 40, rng)
+	if bestArea > startArea+1e-6 {
+		t.Fatalf("improve worsened area: %v -> %v", startArea, bestArea)
+	}
+	// Still non-overlapping
+	x, y, _, _ := packSequencePair(ws, hs, bp, bm)
+	for i := 0; i < len(ws); i++ {
+		for j := i + 1; j < len(ws); j++ {
+			if rectsOverlap(x[i], y[i], ws[i], hs[i], x[j], y[j], ws[j], hs[j]) {
+				t.Errorf("overlap after improve")
+			}
+		}
+	}
+}

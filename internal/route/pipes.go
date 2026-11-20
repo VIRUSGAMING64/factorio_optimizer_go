@@ -95,15 +95,8 @@ func RoutePipes(p *plan.Plan, pl place.Placement, occ []int, w, h int) PipeResul
 		if len(sources) == 0 || len(targets) == 0 {
 			continue
 		}
-		// BFS from first source to nearest target
-		src := sources[0]
-		best := []geom.Point(nil)
-		for _, tgt := range targets {
-			path := bfsPath(src, tgt, walkable, w, h)
-			if path != nil && (best == nil || len(path) < len(best)) {
-				best = path
-			}
-		}
+		// Multi-source BFS: find the shortest path from any source to any target.
+		best := multiSourceBFS(sources, targets, walkable, w, h)
 		if best == nil {
 			failed = append(failed, net.ID)
 			continue
@@ -124,6 +117,71 @@ func RoutePipes(p *plan.Plan, pl place.Placement, occ []int, w, h int) PipeResul
 		}
 	}
 	return PipeResult{Entities: ents, Pipes: pipes, Failed: failed}
+}
+
+// multiSourceBFS returns the shortest path from any source to any target.
+// Sources and targets are treated as free (walkable is only required for intermediate tiles
+// when they are not the endpoints themselves).
+func multiSourceBFS(sources, targets []geom.Point, walkable func(geom.Point) bool, w, h int) []geom.Point {
+	if len(sources) == 0 || len(targets) == 0 {
+		return nil
+	}
+	targetSet := map[geom.Point]bool{}
+	for _, t := range targets {
+		targetSet[t] = true
+	}
+	type node struct {
+		p    geom.Point
+		prev geom.Point
+		hasP bool
+	}
+	queue := make([]node, 0, len(sources))
+	came := map[geom.Point]geom.Point{}
+	seen := map[geom.Point]bool{}
+	for _, s := range sources {
+		if s.X < 0 || s.X >= w || s.Y < 0 || s.Y >= h {
+			continue
+		}
+		queue = append(queue, node{p: s})
+		seen[s] = true
+	}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if targetSet[cur.p] && (cur.hasP || len(sources) == 1) {
+			path := []geom.Point{cur.p}
+			for {
+				prev, ok := came[path[len(path)-1]]
+				if !ok {
+					break
+				}
+				path = append(path, prev)
+			}
+			for a, b := 0, len(path)-1; a < b; a, b = a+1, b-1 {
+				path[a], path[b] = path[b], path[a]
+			}
+			if len(path) > 1 || (len(path) == 1 && sources[0] == targets[0]) {
+				return path
+			}
+		}
+		for _, d := range geom.AllDirections {
+			np := cur.p.Add(d.Delta())
+			if np.X < 0 || np.X >= w || np.Y < 0 || np.Y >= h {
+				continue
+			}
+			if seen[np] {
+				continue
+			}
+			// Endpoints are always acceptable; intermediates must be walkable.
+			if !targetSet[np] && !walkable(np) {
+				continue
+			}
+			seen[np] = true
+			came[np] = cur.p
+			queue = append(queue, node{p: np, prev: cur.p, hasP: true})
+		}
+	}
+	return nil
 }
 
 func bfsPath(src, dst geom.Point, walkable func(geom.Point) bool, w, h int) []geom.Point {
