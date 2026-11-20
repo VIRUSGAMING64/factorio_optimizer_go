@@ -225,3 +225,28 @@ The core pipeline is stable and importable. With the pure-Go simplex refinement 
 3. More sophisticated sequence-pair move operators (pair swaps, block moves)
    inside a dedicated SA loop when the number of blocks is small.
 4. Stronger fluid / heat pipe routing heuristics.
+
+### 2026-11-20 (continued – residual lane capacity in PathFinder A*)
+- Extended the lane-aware A* (`internal/route/lane_astar.go`) with
+  `FindPathLaneAStarCapacity`.
+  - Accepts an optional `*LaneTracker`.
+  - When present, step cost is increased proportionally to the used fraction
+    of the chosen lane (penalty up to ~1.2).
+  - Search therefore prefers freer residual capacity of the same net.
+- Router (`internal/route/router.go`) now calls the capacity-aware variant,
+  passing `r.lanes`, so multi-net routing accounts for already-committed load.
+- Backward-compatible wrapper `FindPathLaneAStar` still exists (nil tracker).
+- New unit test verifies the capacity path is produced.
+- Full suite remains green (`go test ./...`).
+
+## Current baseline after this session
+- PathFinder A* now prefers residual free lanes during routing.
+- All previous features (sequence-pair floorplan, pure-Go LP refine, residuals,
+  beacons, validation, blueprints, viz) unchanged and stable.
+
+### Next high-value modular steps
+1. Optional dual simplex or better pivoting for larger LP instances.
+2. More sophisticated sequence-pair move operators inside a dedicated SA loop
+   when the number of blocks is small.
+3. Stronger fluid / heat pipe routing heuristics.
+4. Further lane polarity refinements (prefer matching inserter side).

@@ -228,7 +228,7 @@ func Route(p *plan.Plan, pl place.Placement, beltTier string) Result {
 			bestLanes := []Lane(nil)
 			bestLen := math.MaxInt
 			for _, src := range sources {
-				path, lanes := pf.FindPathLaneAStar(src, tgt, net.ID, LaneLeft)
+				path, lanes := pf.FindPathLaneAStarCapacity(src, tgt, net.ID, LaneLeft, r.lanes)
 				if path == nil {
 					path = pf.FindPath(src, tgt, net.ID)
 					lanes = nil
@@ -265,7 +265,7 @@ func Route(p *plan.Plan, pl place.Placement, beltTier string) Result {
 			bestLanes := []Lane(nil)
 			bestLen := math.MaxInt
 			for _, tgt := range targets {
-				path, lanes := pf.FindPathLaneAStar(src, tgt, net.ID, LaneLeft)
+				path, lanes := pf.FindPathLaneAStarCapacity(src, tgt, net.ID, LaneLeft, r.lanes)
 				if path == nil {
 					path = pf.FindPath(src, tgt, net.ID)
 					lanes = nil
