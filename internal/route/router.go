@@ -615,4 +615,16 @@ func uniqueInts(a []int) []int {
 	for _, v := range a {
 		if !m[v] {
 			m[v] = true
-			out 
+			out = append(out, v)
+		}
+	}
+	sort.Ints(out)
+	return out
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
