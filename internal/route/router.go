@@ -225,15 +225,18 @@ func Route(p *plan.Plan, pl place.Placement, beltTier string) Result {
 		connected := 0
 		for _, tgt := range targets {
 			bestPath := []geom.Point(nil)
+			bestLanes := []Lane(nil)
 			bestLen := math.MaxInt
 			for _, src := range sources {
-				path, _ := pf.FindPathLaneAStar(src, tgt, net.ID, LaneLeft)
+				path, lanes := pf.FindPathLaneAStar(src, tgt, net.ID, LaneLeft)
 				if path == nil {
 					path = pf.FindPath(src, tgt, net.ID)
+					lanes = nil
 				}
 				if path != nil && len(path) < bestLen {
 					bestLen = len(path)
 					bestPath = path
+					bestLanes = lanes
 				}
 			}
 			if bestPath == nil {
@@ -242,7 +245,7 @@ func Route(p *plan.Plan, pl place.Placement, beltTier string) Result {
 			}
 			connected++
 			// Compress long straight segments into undergrounds
-			ents, b, u := r.pathToEntities(bestPath, net)
+			ents, b, u := r.pathToEntitiesWithLanes(bestPath, bestLanes, net)
 			entities = append(entities, ents...)
 			belts += b
 			ugs += u
@@ -259,19 +262,22 @@ func Route(p *plan.Plan, pl place.Placement, beltTier string) Result {
 		// Second pass: ensure each source reaches at least one target via existing or new path
 		for _, src := range sources {
 			bestPath := []geom.Point(nil)
+			bestLanes := []Lane(nil)
 			bestLen := math.MaxInt
 			for _, tgt := range targets {
-				path, _ := pf.FindPathLaneAStar(src, tgt, net.ID, LaneLeft)
+				path, lanes := pf.FindPathLaneAStar(src, tgt, net.ID, LaneLeft)
 				if path == nil {
 					path = pf.FindPath(src, tgt, net.ID)
+					lanes = nil
 				}
 				if path != nil && len(path) < bestLen {
 					bestLen = len(path)
 					bestPath = path
+					bestLanes = lanes
 				}
 			}
 			if bestPath != nil {
-				ents, b, u := r.pathToEntities(bestPath, net)
+				ents, b, u := r.pathToEntitiesWithLanes(bestPath, bestLanes, net)
 				entities = append(entities, ents...)
 				belts += b
 				ugs += u
@@ -375,6 +381,14 @@ func Route(p *plan.Plan, pl place.Placement, beltTier string) Result {
 
 // pathToEntities places belts and optionally undergrounds along a path.
 func (r *Router) pathToEntities(path []geom.Point, net plan.Net) (ents []Entity, belts, ugs int) {
+	return r.pathToEntitiesWithLanes(path, nil, net)
+}
+
+// pathToEntitiesWithLanes is the lane-aware variant. When a per-tile preferred
+// lane is supplied (from FindPathLaneAStar), capacity is recorded on that lane
+// first if residual capacity remains; otherwise the tracker falls back to the
+// lane with more free capacity. Underground tiles are not charged.
+func (r *Router) pathToEntitiesWithLanes(path []geom.Point, lanes []Lane, net plan.Net) (ents []Entity, belts, ugs int) {
 	if len(path) == 0 {
 		return nil, 0, 0
 	}
@@ -430,6 +444,10 @@ func (r *Router) pathToEntities(path []geom.Point, net plan.Net) (ents []Entity,
 			if rateShare > r.lanes.CapPerLane()*2 {
 				rateShare = r.lanes.CapPerLane() // clamp extreme rates
 			}
+			prefer := LaneLeft
+			if lanes != nil && i < len(lanes) {
+				prefer = lanes[i]
+			}
 			if r.occ[idx] == 0 {
 				dir := geom.East
 				if i+1 < len(path) {
@@ -438,20 +456,33 @@ func (r *Router) pathToEntities(path []geom.Point, net plan.Net) (ents []Entity,
 					dir = dirBetween(path[i-1], path[i])
 				}
 				r.occ[idx] = net.ID + 1
-				r.lanes.Add(idx, rateShare)
+				r.recordLaneLoad(idx, prefer, rateShare)
 				ents = append(ents, Entity{
 					Name: r.belt.Belt, Kind: KindBelt,
 					X: t.X, Y: t.Y, Dir: dir, Item: net.Item, NetID: net.ID,
 				})
 				belts++
 			} else if r.occ[idx] == net.ID+1 && r.lanes.CanShare(idx, rateShare*0.5) {
-				// Same-net reuse: record additional load
-				r.lanes.Add(idx, rateShare*0.5)
+				// Same-net reuse: record additional load, preferring the chosen lane
+				r.recordLaneLoad(idx, prefer, rateShare*0.5)
 			}
 		}
 		i++
 	}
 	return ents, belts, ugs
+}
+
+// recordLaneLoad tries the preferred lane first; falls back to the lane with
+// more residual capacity when the preferred one cannot accept the full rate.
+func (r *Router) recordLaneLoad(idx int, prefer Lane, rate float64) {
+	if rate <= 0 {
+		return
+	}
+	if r.lanes.CanShareLane(idx, prefer, rate) {
+		r.lanes.AddLane(idx, prefer, rate)
+		return
+	}
+	r.lanes.Add(idx, rate)
 }
 
 func (r *Router) idx(x, y int) int { return y*r.w + x }

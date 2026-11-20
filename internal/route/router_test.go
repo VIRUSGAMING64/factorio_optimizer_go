@@ -66,3 +66,27 @@ func TestAStarPath(t *testing.T) {
 		t.Fatalf("path too short %d", len(path))
 	}
 }
+
+func TestPathToEntitiesWithLanesPreference(t *testing.T) {
+	// Minimal router just to exercise lane recording
+	tier := data.BeltTier{Key: "fast", Throughput: 30, MaxUndergroundGap: 9, Belt: "fast-transport-belt", Underground: "fast-underground-belt"}
+	r := &Router{
+		w: 10, h: 10,
+		occ:   make([]int, 100),
+		hist:  make([]float64, 100),
+		lanes: NewLaneTracker(tier),
+		belt:  tier,
+	}
+	path := []geom.Point{{0, 0}, {1, 0}, {2, 0}}
+	lanes := []Lane{LaneRight, LaneRight, LaneRight}
+	net := plan.Net{ID: 1, Rate: 5, Item: "iron-plate"}
+	ents, belts, ugs := r.pathToEntitiesWithLanes(path, lanes, net)
+	if belts != 3 || ugs != 0 || len(ents) != 3 {
+		t.Fatalf("expected 3 belts, got belts=%d ugs=%d ents=%d", belts, ugs, len(ents))
+	}
+	idx := r.idx(0, 0)
+	if r.lanes.UsedLane(idx, LaneRight) < 4.9 {
+		t.Fatalf("expected load on preferred right lane, got left=%v right=%v",
+			r.lanes.UsedLane(idx, LaneLeft), r.lanes.UsedLane(idx, LaneRight))
+	}
+}

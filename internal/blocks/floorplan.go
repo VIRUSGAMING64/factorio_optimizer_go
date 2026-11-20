@@ -140,8 +140,11 @@ func Pack(blocks []FloorBlock, nets []FloorNet, aspect float64, attempts int) Fl
 
 		var x, y []int
 		var maxX, maxY int
-		if a%2 == 0 {
+		if a%3 == 0 {
 			x, y, maxX, maxY = packSkyline(ws, hs, order, targetW)
+		} else if a%3 == 1 {
+			gp, gm := randomSequencePair(rng, len(blocks))
+			x, y, maxX, maxY = packSequencePair(ws, hs, gp, gm)
 		} else {
 			// original row-major fallback
 			x = make([]int, len(blocks))

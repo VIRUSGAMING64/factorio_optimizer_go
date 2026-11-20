@@ -197,3 +197,31 @@ internal/
 
 ## Summary of progress toward readiness
 The core pipeline is stable and importable. With the pure-Go simplex refinement the planner now has an optional exact LP path for the selected recipes, closing one of the original "no real LP" gaps without introducing CGO. Remaining work is incremental (lane polarity, inserter rate guarantees, denser floorplan refinement) and can be done modularly without risking the existing green tests.
+
+### 2026-11-20 (continued – sequence-pair floorplan refinement)
+- Added modular sequence-pair packer (`internal/blocks/sequence.go`).
+  - Pure-Go approximation of classical sequence-pair floorplanning.
+  - Derives left-of / below constraints from a pair of permutations and places
+    blocks via a longest-path earliest-coordinate algorithm.
+  - Guarantees non-overlapping placement for any valid sequence pair.
+- Integrated into `blocks.Pack` as a third candidate strategy (alongside skyline
+  and row-major). Every third attempt uses a random sequence pair so the search
+  explores both bottom-left skyline and relative-order representations.
+- Unit tests verify non-overlap and that Pack still returns a feasible floorplan
+  when sequence-pair is in the mix.
+- Full suite remains green after the change (`go test ./...`).
+
+## Current baseline after this session
+- Floorplan packing now has an additional modular sequence-pair path that can
+  produce denser or differently shaped block arrangements for wire-length
+  critical nets.
+- All previous features (lane-aware routing, pure-Go LP refine, residuals,
+  beacons, validation, blueprints, viz) unchanged and stable.
+
+### Next high-value modular steps
+1. Feed residual lane capacity into PathFinder A* step costs so the search
+   prefers free lanes during routing (building on the existing LaneTracker).
+2. Optional dual simplex or better pivoting for larger LP instances.
+3. More sophisticated sequence-pair move operators (pair swaps, block moves)
+   inside a dedicated SA loop when the number of blocks is small.
+4. Stronger fluid / heat pipe routing heuristics.
