@@ -427,8 +427,8 @@ func (r *Router) pathToEntities(path []geom.Point, net plan.Net) (ents []Entity,
 		if r.inBounds(t) {
 			idx := r.idx(t.X, t.Y)
 			rateShare := math.Abs(net.Rate)
-			if rateShare > r.lanes.cap {
-				rateShare = r.lanes.cap * 0.5 // clamp extreme rates
+			if rateShare > r.lanes.CapPerLane()*2 {
+				rateShare = r.lanes.CapPerLane() // clamp extreme rates
 			}
 			if r.occ[idx] == 0 {
 				dir := geom.East

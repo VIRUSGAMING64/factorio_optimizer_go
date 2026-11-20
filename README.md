@@ -1,35 +1,56 @@
 # Factorio Optimizer (Go)
 
-Go port of [SeezoCode/factorio_optimizer_v2](https://github.com/SeezoCode/factorio_optimizer_v2) — Factorio 2.0 layout optimizer:
+Port de [SeezoCode/factorio_optimizer_v2](https://github.com/SeezoCode/factorio_optimizer_v2) a Go.
 
-**plan → place (SA + HPWL + bins + DI) → route (lane A* + multipass) → validate → emit blueprint**
+Pipeline: **plan → place → route → validate → blueprint**
 
-## Requirements
+## Requisitos
 
 - Go 1.22+
-- `data/recipes.json` from the original project:
+
+## Uso rápido (tras clonar)
 
 ```bash
-curl -L -o data/recipes.json \
-  https://raw.githubusercontent.com/SeezoCode/factorio_optimizer_v2/main/data/recipes.json
-```
+git clone https://github.com/VIRUSGAMING64/factorio_optimizer_go.git
+cd factorio_optimizer_go
 
-## Run
+# Demo red + green science (defaults)
+go run .
 
-```bash
+# Con flags
+go run . -config=data/red_green.json -sa-iters=30000 -attempts=2
+go run . -config=data/config.json -sa-iters=20000
+
 go test ./...
-go run ./cmd/optimize --config=data/red_green.json --sa-iters=30000 --attempts=2
-go run ./cmd/optimize --config=data/config.json --sa-iters=8000
+go build -o optimize .
+./optimize -config=data/red_green.json
 ```
 
-## Status (~9k LOC, 116+ tests)
+También: `make run` · `make test` · `make build`
 
-Implemented: greedy plan + rebalance, SA placement (HPWL, congestion bins, DI credit, clusters),
-lane-aware PathFinder, multipass/negotiate routing, factory-of-blocks + column templates,
-validation (rates, layout detail, inserters, shape), blueprint emit, poles/beacons/heat, viz.
+### Flags
 
-Still lighter than upstream: full Templates.kt, PlaceModel fluid stubs, real LP solver, UI.
+| Flag | Default | Descripción |
+|------|---------|-------------|
+| `-config` | `data/red_green.json` | Job (targets, máquinas) |
+| `-data` | `data/recipes.json` | Base de datos Factorio |
+| `-tuning` | `data/tuning.json` | Knobs SA/route |
+| `-sa-iters` | `30000` | Iteraciones annealing |
+| `-attempts` | `1` | Reintentos place+route |
+| `-out` | `solves/<timestamp>-sa` | Carpeta de salida |
 
-## License
+Salida: `blueprint.txt` (importable), `validation.txt`, `plan_summary.txt`.
 
-Port for learning/interoperability; respect upstream license for algorithms and data.
+## Estructura
+
+```
+main.go              ← go run .
+cmd/optimize/        ← go run ./cmd/optimize
+data/recipes.json    ← incluido en el repo
+data/*.json          ← configs de ejemplo
+internal/...
+```
+
+## Estado
+
+~9k LOC, 116+ tests. PathFinder con lanes, SA con HPWL/bins/DI, factory-of-blocks, validación rates/layout/inserters/shape.

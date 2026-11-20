@@ -1,0 +1,9 @@
+{
+  "quality": "normal",
+  "machine": "assembling-machine-3",
+  "belt_tier": "fast",
+  "forbidden_recipes": [],
+  "targets": [
+    { "name": "processing-unit", "amount": 0.5 }
+  ]
+}

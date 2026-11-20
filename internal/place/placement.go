@@ -342,7 +342,8 @@ func (m *Model) Cost() float64 {
 	}
 	di := DICredit(m.px, m.py, m.mw, m.mh, m.linked, 1)
 	nr := NetRemovalCredit(m.px, m.py, m.mw, m.mh, m.netTerms, 2.0)
-	return spread + 0.35*cluster + affinity + 0.5*spacing + 0.15*hpwl + 2.0*binPen - di - nr
+	fluid := m.FluidSpreadPenalty()
+	return spread + 0.35*cluster + affinity + 0.5*spacing + 0.15*hpwl + 2.0*binPen - di + fluid - nr
 
 }
 

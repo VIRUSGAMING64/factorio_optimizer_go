@@ -22,7 +22,7 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "data/example_config.json", "job configuration JSON")
+	configPath := flag.String("config", "data/red_green.json", "job configuration JSON")
 	tuningPath := flag.String("tuning", "data/tuning.json", "tuning knobs JSON")
 	dataPath := flag.String("data", "data/recipes.json", "Factorio data (recipes.json)")
 	outDir := flag.String("out", "", "output directory (default: solves/<timestamp>)")
@@ -44,18 +44,22 @@ func main() {
 		return
 	}
 
+	*configPath = resolvePath(*configPath)
+	*dataPath = resolvePath(*dataPath)
+	*tuningPath = resolvePath(*tuningPath)
+
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "config: %v\nTried path: %s\n", err, *configPath)
 		os.Exit(1)
 	}
 	if cfg.Data != "" {
-		*dataPath = cfg.Data
+		*dataPath = resolvePath(cfg.Data)
 	}
 
 	root, err := data.LoadRootData(*dataPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "data: %v\n", err)
+		fmt.Fprintf(os.Stderr, "data: %v\nTried path: %s\nEnsure data/recipes.json exists (shipped in repo).\n", err, *dataPath)
 		os.Exit(1)
 	}
 	fmt.Printf("Loaded game data %s – %d recipes, %d items, %d entities\n",
@@ -204,6 +208,16 @@ func main() {
 	fmt.Print("  ", detail.String())
 	ins := validate.CheckInserters(rt.Entities, false)
 	fmt.Print("  ", ins.String())
+	shape := validate.CheckBeltShapes(rt.Entities)
+	fmt.Print("  ", shape.String())
+	if cont := validate.CheckLaneContamination(rt.Entities); len(cont) > 0 {
+		fmt.Printf("  Contamination: %d issue(s)\n", len(cont))
+		for _, e := range cont {
+			fmt.Println("  -", e.String())
+		}
+	} else {
+		fmt.Println("  Contamination: OK")
+	}
 	valText := rep.String() + "\n" + rates.String() + "\n" + layout.String() + "\n" + lrates.String() + "\n" + detail.String() + "\n" + ins.String()
 	_ = os.WriteFile(filepath.Join(*outDir, "validate.txt"), []byte(valText), 0o644)
 	// ASCII layout for quick inspection
@@ -278,4 +292,24 @@ func writePlacement(outDir string, p *plan.Plan, pl place.Placement) {
 	}
 	fmt.Fprintf(f, "\nASCII preview:\n%s", pl.ASCII(p))
 	fmt.Printf("  placement → %s\n", path)
+}
+
+
+// resolvePath returns an existing path, trying a few common locations
+// so the binary works from the repo root after clone.
+func resolvePath(p string) string {
+	if p == "" {
+		return p
+	}
+	candidates := []string{p}
+	// When running from a subdir or after go install
+	for _, prefix := range []string{".", "..", "../.."} {
+		candidates = append(candidates, filepath.Join(prefix, p))
+	}
+	for _, c := range candidates {
+		if st, err := os.Stat(c); err == nil && !st.IsDir() {
+			return c
+		}
+	}
+	return p
 }
