@@ -311,3 +311,29 @@ The core pipeline is stable and importable. With the pure-Go simplex refinement 
    lane load so polarity preference is applied at commit time as well.
 3. Heat-pipe / nuclear routing heuristics beyond the simple lattice.
 4. Optional external LP solver interface for larger recipe sets.
+
+### 2026-11-20 (continued – commit-time polarity + heat-pipe lattice)
+- Restored full `internal/route/router.go` after an accidental truncation.
+- `preferredStartLane` now accepts an explicit belt travel direction.
+- Added `applyCommitPolarity`: after A* returns a path the origin lane is
+  re-evaluated with the actual first-segment direction and source access side
+  so recorded load matches Factorio left/right polarity.
+- Added `KindHeatPipe` to `route.EntityKind`.
+- When `cfg.Heat.Enabled` the main pipeline (root and cmd) places a step-3
+  heat-pipe lattice via `power.BuildHeatGrid`, skipping occupied tiles, and
+  emits the entities.
+- Unit test `TestApplyCommitPolarity` covers eastbound and southbound cases.
+- Full suite remains green (`go test ./...`).
+
+## Current baseline after this session
+- Commit-time polarity uses the real path direction.
+- Optional heat-pipe lattice is emitted for jobs that request it.
+- All previous features (capacity-aware residual lanes, sequence-pair floorplan,
+  pure-Go LP refine with Bland's rule, residuals, beacons, validation,
+  blueprints, viz) unchanged and stable.
+
+### Next high-value modular steps
+1. True dual-simplex pivots when a dual-feasible basis is available.
+2. Smarter heat routing (coverage-aware or shortest-path lattice).
+3. Optional external LP solver interface for larger recipe sets.
+4. Denser floorplan refinement and more aggressive underground compression.
