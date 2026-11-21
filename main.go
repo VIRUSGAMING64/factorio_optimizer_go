@@ -235,7 +235,7 @@ func main() {
 			placed++
 		}
 		if placed > 0 {
-			fmt.Printf("  → placed %d heat pipes (coverage)\n", placed)
+			fmt.Printf("  → placed %d heat pipes (coverage+tree)\n", placed)
 		}
 	}
 
