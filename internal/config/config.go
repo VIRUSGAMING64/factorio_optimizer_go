@@ -61,6 +61,9 @@ type RecyclingConfig struct {
 // HeatConfig for Aquilo heating.
 type HeatConfig struct {
 	Enabled bool `json:"enabled"`
+	// Reach is the manhattan distance (tiles) within which a heat pipe covers a machine centre.
+	// Zero or negative means the pipeline default (4).
+	Reach int `json:"reach,omitempty"`
 }
 
 // SpoilageConfig for Gleba.

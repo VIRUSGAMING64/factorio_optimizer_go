@@ -337,3 +337,21 @@ The core pipeline is stable and importable. With the pure-Go simplex refinement 
 2. Smarter heat routing (coverage-aware or shortest-path lattice).
 3. Optional external LP solver interface for larger recipe sets.
 4. Denser floorplan refinement and more aggressive underground compression.
+
+### 2026-11-20 (continued – coverage-aware heat pipes)
+- Added `power.BuildHeatCoverage`: greedy set-cover over a step lattice that places the fewest heat pipes still covering every machine centre within a configurable manhattan reach.
+- Falls back to the previous full lattice when no machines are present or coverage cannot be completed from free candidates.
+- `HeatConfig` gained an optional `reach` field (default 4 in the pipeline).
+- Root `main.go` and `cmd/optimize/main.go` now collect machine centres from the placement and call the coverage-aware builder.
+- Unit tests cover sparsity vs full grid and fallback behaviour.
+- Full suite remains green after the change (`go test ./...`).
+
+## Current baseline after this session
+- Heat pipes are placed only where they improve machine coverage, reducing entity count while still guaranteeing reach.
+- All previous features (commit-time polarity, capacity-aware residual lanes, sequence-pair floorplan, pure-Go LP refine with Bland's rule, residuals, beacons, validation, blueprints, viz) unchanged and stable.
+
+### Next high-value modular steps
+1. True dual-simplex pivots when a dual-feasible basis is available.
+2. Optional external LP solver interface for larger recipe sets.
+3. Denser floorplan refinement and more aggressive underground compression.
+4. Connected heat-pipe trees (shortest-path or MST between the selected coverage points).

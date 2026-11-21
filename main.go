@@ -194,7 +194,8 @@ func main() {
 		}
 	}
 
-	// Optional heat-pipe lattice (Aquilo / nuclear) when enabled
+	// Optional heat-pipe lattice (Aquilo / nuclear) when enabled.
+	// Prefers a coverage-aware sparse lattice that still reaches every machine.
 	if cfg.Heat.Enabled && pl.W > 0 && pl.H > 0 {
 		occupied := func(x, y int) bool {
 			if x < 0 || y < 0 || x >= pl.W || y >= pl.H {
@@ -207,7 +208,18 @@ func main() {
 			}
 			return false
 		}
-		hn := power.BuildHeatGrid(pl.W, pl.H, 3)
+		centers := make([]power.MachineCenter, 0, len(pl.Machines))
+		for _, pm := range pl.Machines {
+			mi := p.Machines[pm.ID]
+			cx := float64(pm.X) + float64(mi.W)/2
+			cy := float64(pm.Y) + float64(mi.H)/2
+			centers = append(centers, power.MachineCenter{X: cx, Y: cy})
+		}
+		reach := 4
+		if cfg.Heat.Reach > 0 {
+			reach = cfg.Heat.Reach
+		}
+		hn := power.BuildHeatCoverage(pl.W, pl.H, 3, reach, centers, occupied)
 		placed := 0
 		for _, hp := range hn.Pipes {
 			if occupied(hp.X, hp.Y) {
@@ -222,7 +234,7 @@ func main() {
 			placed++
 		}
 		if placed > 0 {
-			fmt.Printf("  → placed %d heat pipes\n", placed)
+			fmt.Printf("  → placed %d heat pipes (coverage)\n", placed)
 		}
 	}
 
