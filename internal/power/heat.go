@@ -160,8 +160,9 @@ func absF(v float64) float64 {
 // ConnectHeatTree links the pipes of a coverage network into a connected tree.
 // It builds a minimum spanning tree on manhattan distance (Prim) and inserts
 // intermediate heat-pipe tiles along each edge so the result is 4-connected.
-// Occupied tiles are skipped when an alternative L-shaped path exists; the
-// function never removes existing coverage pipes.
+// When an occupancy predicate is supplied it first tries an A* path that
+// strongly prefers free tiles; falls back to the classic L-shaped pair if A*
+// cannot improve occupancy.
 func ConnectHeatTree(hn HeatNetwork, occupied func(int, int) bool) HeatNetwork {
 	n := len(hn.Pipes)
 	if n <= 1 {
@@ -239,11 +240,87 @@ func ConnectHeatTree(hn HeatNetwork, occupied func(int, int) bool) HeatNetwork {
 			continue
 		}
 		a, b := pipes[parent[i]], pipes[i]
-		for _, tile := range manhattanPath(a, b, occupied) {
+		path := connectPath(a, b, occupied)
+		for _, tile := range path {
 			add(tile.X, tile.Y)
 		}
 	}
 	return HeatNetwork{Pipes: out}
+}
+
+// connectPath returns a 4-connected path from a to b.
+// Prefers an A* route that minimises occupied tiles when a predicate is given;
+// otherwise (or on failure) falls back to the classic L-shaped pair.
+func connectPath(a, b HeatPipePlacement, occupied func(int, int) bool) []HeatPipePlacement {
+	if occupied != nil {
+		if p := heatPathAStar(a, b, occupied); len(p) > 0 {
+			return p
+		}
+	}
+	return manhattanPath(a, b, occupied)
+}
+
+// heatPathAStar finds a 4-connected path from a to b that strongly prefers
+// free tiles. Occupied tiles cost 100, free tiles cost 1. Returns nil if no
+// path is found within a reasonable node budget (caller falls back).
+func heatPathAStar(a, b HeatPipePlacement, occupied func(int, int) bool) []HeatPipePlacement {
+	if a.X == b.X && a.Y == b.Y {
+		return []HeatPipePlacement{a}
+	}
+	type node struct {
+		x, y, g, f int
+		parent     *node
+	}
+	dirs := [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+	open := []*node{{x: a.X, y: a.Y, g: 0, f: abs(a.X-b.X) + abs(a.Y-b.Y)}}
+	closed := map[geom.Point]bool{}
+	const maxNodes = 8000
+	expanded := 0
+
+	for len(open) > 0 && expanded < maxNodes {
+		// extract min-f (simple linear scan; heat graphs are small)
+		bestI := 0
+		for i := 1; i < len(open); i++ {
+			if open[i].f < open[bestI].f {
+				bestI = i
+			}
+		}
+		cur := open[bestI]
+		open = append(open[:bestI], open[bestI+1:]...)
+		k := geom.Point{cur.x, cur.y}
+		if closed[k] {
+			continue
+		}
+		closed[k] = true
+		expanded++
+		if cur.x == b.X && cur.y == b.Y {
+			// reconstruct
+			var rev []HeatPipePlacement
+			for n := cur; n != nil; n = n.parent {
+				rev = append(rev, HeatPipePlacement{X: n.x, Y: n.y})
+			}
+			// reverse
+			for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
+				rev[i], rev[j] = rev[j], rev[i]
+			}
+			return rev
+		}
+		for _, d := range dirs {
+			nx, ny := cur.x+d[0], cur.y+d[1]
+			nk := geom.Point{nx, ny}
+			if closed[nk] {
+				continue
+			}
+			step := 1
+			if occupied(nx, ny) {
+				step = 100
+			}
+			ng := cur.g + step
+			nf := ng + abs(nx-b.X) + abs(ny-b.Y)
+			open = append(open, &node{x: nx, y: ny, g: ng, f: nf, parent: cur})
+		}
+	}
+	return nil
 }
 
 // manhattanPath returns the intermediate tiles (inclusive) that connect a to b

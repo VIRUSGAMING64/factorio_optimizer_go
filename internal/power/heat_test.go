@@ -113,3 +113,42 @@ func isConnected(hn HeatNetwork) bool {
 	}
 	return true
 }
+
+func TestConnectHeatTreeAvoidsOccupied(t *testing.T) {
+	// Direct L-paths would cross the occupied strip; A* should detour.
+	hn := HeatNetwork{Pipes: []HeatPipePlacement{
+		{X: 0, Y: 0},
+		{X: 4, Y: 0},
+	}}
+	// Block the entire horizontal corridor at y=0 except the endpoints.
+	occupied := func(x, y int) bool {
+		return y == 0 && x > 0 && x < 4
+	}
+	connected := ConnectHeatTree(hn, occupied)
+	if !isConnected(connected) {
+		t.Fatal("result must stay 4-connected")
+	}
+	// Count how many pipes sit on the blocked row (should be only the two endpoints).
+	blockedHits := 0
+	for _, p := range connected.Pipes {
+		if occupied(p.X, p.Y) {
+			blockedHits++
+		}
+	}
+	if blockedHits > 0 {
+		t.Fatalf("A* path should avoid the occupied strip, hit %d blocked tiles", blockedHits)
+	}
+	// Original points still present.
+	for _, p := range hn.Pipes {
+		found := false
+		for _, q := range connected.Pipes {
+			if q.X == p.X && q.Y == p.Y {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("original pipe (%d,%d) missing", p.X, p.Y)
+		}
+	}
+}

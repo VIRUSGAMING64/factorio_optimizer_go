@@ -372,3 +372,28 @@ The core pipeline is stable and importable. With the pure-Go simplex refinement 
 2. Optional external LP solver interface for larger recipe sets.
 3. Denser floorplan refinement and more aggressive underground compression.
 4. Smarter heat routing that respects residual occupancy more aggressively (shortest-path lattice avoiding machines).
+
+### 2026-11-20 (continued – occupancy-aware A* heat-pipe connections)
+- Enhanced `ConnectHeatTree` with a modular A* connector (`heatPathAStar`).
+  - When an occupancy predicate is supplied, each MST edge first tries an A*
+    4-connected path that costs free tiles 1 and occupied tiles 100.
+  - Falls back to the classic L-shaped pair if A* exhausts its node budget or
+    finds no improvement.
+  - Original coverage pipes are never removed; the result stays 4-connected.
+- New unit test `TestConnectHeatTreeAvoidsOccupied` verifies that a blocked
+  corridor is detoured around instead of crossed.
+- Full suite remains green after the change (`go test ./...`).
+
+## Current baseline after this session
+- Heat-pipe trees now prefer occupancy-aware A* routes when connecting coverage
+  points, while remaining compatible with the previous L-path fallback.
+- All previous features (coverage-aware placement, commit-time polarity,
+  capacity-aware residual lanes, sequence-pair floorplan, pure-Go LP refine with
+  Bland's rule, residuals, beacons, validation, blueprints, viz) unchanged and
+  stable.
+
+### Next high-value modular steps
+1. True dual-simplex pivots when a dual-feasible basis is available.
+2. Optional external LP solver interface for larger recipe sets.
+3. Denser floorplan refinement and more aggressive underground compression.
+4. Pole set-cover improvements and multi-source MST wiring for power.
