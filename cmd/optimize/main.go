@@ -220,6 +220,7 @@ func main() {
 			reach = cfg.Heat.Reach
 		}
 		hn := power.BuildHeatCoverage(pl.W, pl.H, 3, reach, centers, occupied)
+		hn = power.ConnectHeatTree(hn, occupied)
 		placed := 0
 		for _, hp := range hn.Pipes {
 			if occupied(hp.X, hp.Y) {

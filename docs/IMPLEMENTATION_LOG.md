@@ -355,3 +355,20 @@ The core pipeline is stable and importable. With the pure-Go simplex refinement 
 2. Optional external LP solver interface for larger recipe sets.
 3. Denser floorplan refinement and more aggressive underground compression.
 4. Connected heat-pipe trees (shortest-path or MST between the selected coverage points).
+
+### 2026-11-20 (continued – connected heat-pipe trees)
+- Added `power.ConnectHeatTree`: Prim MST on manhattan distance over the coverage pipes, then fills each edge with a 4-connected manhattan (L-shaped) path.
+- Prefers the L-shape with fewer occupied tiles when an occupied predicate is supplied; never drops original coverage pipes.
+- Root `main.go` and `cmd/optimize/main.go` now call `ConnectHeatTree` immediately after `BuildHeatCoverage` so emitted heat networks are continuous.
+- Unit tests verify connectivity, presence of intermediates, preservation of original points, and the single-pipe identity case.
+- Full suite remains green after the change (`go test ./...`).
+
+## Current baseline after this session
+- Heat pipes from the coverage placer are now linked into a connected tree, guaranteeing 4-neighbour continuity for heat flow.
+- All previous features (coverage-aware placement, commit-time polarity, capacity-aware residual lanes, sequence-pair floorplan, pure-Go LP refine with Bland's rule, residuals, beacons, validation, blueprints, viz) unchanged and stable.
+
+### Next high-value modular steps
+1. True dual-simplex pivots when a dual-feasible basis is available.
+2. Optional external LP solver interface for larger recipe sets.
+3. Denser floorplan refinement and more aggressive underground compression.
+4. Smarter heat routing that respects residual occupancy more aggressively (shortest-path lattice avoiding machines).

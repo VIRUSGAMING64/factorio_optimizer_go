@@ -156,3 +156,178 @@ func absF(v float64) float64 {
 	}
 	return v
 }
+
+// ConnectHeatTree links the pipes of a coverage network into a connected tree.
+// It builds a minimum spanning tree on manhattan distance (Prim) and inserts
+// intermediate heat-pipe tiles along each edge so the result is 4-connected.
+// Occupied tiles are skipped when an alternative L-shaped path exists; the
+// function never removes existing coverage pipes.
+func ConnectHeatTree(hn HeatNetwork, occupied func(int, int) bool) HeatNetwork {
+	n := len(hn.Pipes)
+	if n <= 1 {
+		return hn
+	}
+
+	// Deduplicate input while preserving order.
+	seen := map[geom.Point]bool{}
+	var pipes []HeatPipePlacement
+	for _, p := range hn.Pipes {
+		k := geom.Point{p.X, p.Y}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		pipes = append(pipes, p)
+	}
+	n = len(pipes)
+	if n <= 1 {
+		return HeatNetwork{Pipes: pipes}
+	}
+
+	// Prim's algorithm: parent[i] = index of the node that connects i.
+	inTree := make([]bool, n)
+	parent := make([]int, n)
+	dist := make([]int, n)
+	for i := range dist {
+		dist[i] = int(1e9)
+		parent[i] = -1
+	}
+	dist[0] = 0
+
+	for count := 0; count < n; count++ {
+		u := -1
+		best := int(1e9)
+		for i := 0; i < n; i++ {
+			if !inTree[i] && dist[i] < best {
+				best = dist[i]
+				u = i
+			}
+		}
+		if u < 0 {
+			break
+		}
+		inTree[u] = true
+		for v := 0; v < n; v++ {
+			if inTree[v] {
+				continue
+			}
+			d := abs(pipes[u].X-pipes[v].X) + abs(pipes[u].Y-pipes[v].Y)
+			if d < dist[v] {
+				dist[v] = d
+				parent[v] = u
+			}
+		}
+	}
+
+	// Collect all tiles: original + intermediates along MST edges.
+	outSeen := map[geom.Point]bool{}
+	var out []HeatPipePlacement
+	add := func(x, y int) {
+		k := geom.Point{x, y}
+		if outSeen[k] {
+			return
+		}
+		outSeen[k] = true
+		out = append(out, HeatPipePlacement{X: x, Y: y})
+	}
+	for _, p := range pipes {
+		add(p.X, p.Y)
+	}
+
+	for i := 1; i < n; i++ {
+		if parent[i] < 0 {
+			continue
+		}
+		a, b := pipes[parent[i]], pipes[i]
+		for _, tile := range manhattanPath(a, b, occupied) {
+			add(tile.X, tile.Y)
+		}
+	}
+	return HeatNetwork{Pipes: out}
+}
+
+// manhattanPath returns the intermediate tiles (inclusive) that connect a to b
+// with a 4-connected path. It tries both L-shapes and prefers the one with
+// fewer occupied tiles.
+func manhattanPath(a, b HeatPipePlacement, occupied func(int, int) bool) []HeatPipePlacement {
+	if a.X == b.X && a.Y == b.Y {
+		return []HeatPipePlacement{a}
+	}
+	hThenV := fillL(a.X, a.Y, b.X, b.Y, true)
+	vThenH := fillL(a.X, a.Y, b.X, b.Y, false)
+	if occupied == nil {
+		return hThenV
+	}
+	score := func(path []HeatPipePlacement) int {
+		s := 0
+		for _, p := range path {
+			if occupied(p.X, p.Y) {
+				s++
+			}
+		}
+		return s
+	}
+	if score(vThenH) < score(hThenV) {
+		return vThenH
+	}
+	return hThenV
+}
+
+// fillL builds an L-shaped path. horizontalFirst walks X then Y.
+func fillL(x1, y1, x2, y2 int, horizontalFirst bool) []HeatPipePlacement {
+	var path []HeatPipePlacement
+	if horizontalFirst {
+		dx := 1
+		if x2 < x1 {
+			dx = -1
+		}
+		for x := x1; x != x2; x += dx {
+			path = append(path, HeatPipePlacement{X: x, Y: y1})
+		}
+		path = append(path, HeatPipePlacement{X: x2, Y: y1})
+		dy := 1
+		if y2 < y1 {
+			dy = -1
+		}
+		for y := y1; y != y2; y += dy {
+			path = append(path, HeatPipePlacement{X: x2, Y: y})
+		}
+		path = append(path, HeatPipePlacement{X: x2, Y: y2})
+	} else {
+		dy := 1
+		if y2 < y1 {
+			dy = -1
+		}
+		for y := y1; y != y2; y += dy {
+			path = append(path, HeatPipePlacement{X: x1, Y: y})
+		}
+		path = append(path, HeatPipePlacement{X: x1, Y: y2})
+		dx := 1
+		if x2 < x1 {
+			dx = -1
+		}
+		for x := x1; x != x2; x += dx {
+			path = append(path, HeatPipePlacement{X: x, Y: y2})
+		}
+		path = append(path, HeatPipePlacement{X: x2, Y: y2})
+	}
+	// Dedup consecutive duplicates that appear when one delta is zero.
+	var uniq []HeatPipePlacement
+	prev := geom.Point{-1e9, -1e9}
+	for _, p := range path {
+		k := geom.Point{p.X, p.Y}
+		if k == prev {
+			continue
+		}
+		uniq = append(uniq, p)
+		prev = k
+	}
+	return uniq
+}
+
+func abs(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}

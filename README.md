@@ -26,7 +26,7 @@ go run ./cmd/optimize --config=data/config.json --sa-iters=8000
 
 Implemented: greedy plan + rebalance + pure-Go LP refine, SA placement (HPWL, congestion bins, DI credit, clusters),
 lane-aware PathFinder + capacity-aware sharing, multipass/negotiate routing, factory-of-blocks + column templates,
-validation (rates, layout detail, inserter geometry + throughput notes, shape), blueprint emit, poles/beacons/heat, ASCII+PNG viz.
+validation (rates, layout detail, inserter geometry + throughput notes, shape), blueprint emit, poles/beacons/heat (coverage + connected tree), ASCII+PNG viz.
 
 Still lighter than upstream: full Templates.kt, PlaceModel fluid stubs, real LP solver, UI.
 
