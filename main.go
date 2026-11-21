@@ -194,6 +194,38 @@ func main() {
 		}
 	}
 
+	// Optional heat-pipe lattice (Aquilo / nuclear) when enabled
+	if cfg.Heat.Enabled && pl.W > 0 && pl.H > 0 {
+		occupied := func(x, y int) bool {
+			if x < 0 || y < 0 || x >= pl.W || y >= pl.H {
+				return true
+			}
+			for _, e := range rt.Entities {
+				if e.X == x && e.Y == y {
+					return true
+				}
+			}
+			return false
+		}
+		hn := power.BuildHeatGrid(pl.W, pl.H, 3)
+		placed := 0
+		for _, hp := range hn.Pipes {
+			if occupied(hp.X, hp.Y) {
+				continue
+			}
+			rt.Entities = append(rt.Entities, route.Entity{
+				Name: data.HeatPipe,
+				Kind: route.KindHeatPipe,
+				X:    hp.X,
+				Y:    hp.Y,
+			})
+			placed++
+		}
+		if placed > 0 {
+			fmt.Printf("  → placed %d heat pipes\n", placed)
+		}
+	}
+
 	// ---- Stage 4: Validate ----
 	fmt.Println("\nStage 4: validating…")
 	rep := validate.Check(p, pl, rt)

@@ -37,3 +37,28 @@ func TestApproachSide(t *testing.T) {
 		t.Errorf("got %v, want East", got)
 	}
 }
+
+func TestApplyCommitPolarity(t *testing.T) {
+	// Eastbound first step; approach from north should prefer LaneLeft.
+	path := []geom.Point{{0, 0}, {1, 0}}
+	lanes := []Lane{LaneRight, LaneLeft}
+	access := []AccessOption{{
+		BeltTile: geom.Point{0, 0},
+		InsTile:  geom.Point{0, -1}, // north of belt
+	}}
+	got := applyCommitPolarity(path, lanes, access)
+	if got[0] != LaneLeft {
+		t.Errorf("expected LaneLeft for east+north, got %v", got[0])
+	}
+	// Southbound first step; approach from west should prefer LaneRight.
+	path2 := []geom.Point{{0, 0}, {0, 1}}
+	lanes2 := []Lane{LaneLeft}
+	access2 := []AccessOption{{
+		BeltTile: geom.Point{0, 0},
+		InsTile:  geom.Point{-1, 0}, // west
+	}}
+	got2 := applyCommitPolarity(path2, lanes2, access2)
+	if got2[0] != LaneRight {
+		t.Errorf("expected LaneRight for south+west, got %v", got2[0])
+	}
+}
